@@ -100,9 +100,8 @@
                     <div class="row justify-content-center text-center">
                         <div class="col-lg-8 col-md-12">
                             <div class="mb-5">
-                                <h2><span class="font-w-4">Simple And</span> Easy To Sign Up</h2>
-                                <p class="lead">We use the latest technologies it voluptatem accusantium doloremque
-                                    laudantium, totam rem aperiam.</p>
+                                <h2><span class="font-w-4">Create Your</span> vCard Account</h2>
+                                <p class="lead">Fill in your details below. Fields marked with * are required. Your profile will be available at {{ config('app.url') }}/<strong>{{ old('slug', $slug ?? 'your-name') }}</strong></p>
                             </div>
                         </div>
                     </div>
@@ -122,26 +121,35 @@
                         @endif
                         <div class="col-lg-8 col-md-10 ms-auto me-auto">
                             <div class="register-form text-center">
-                                <form id="" method="post" action="{{ route('register') }}"
+                                <form id="register-form" method="post" action="{{ route('register') }}"
                                     enctype="multipart/form-data">
                                     @csrf
-                                    <input type="hidden" name="slug" value="{{ $slug }}">
+                                    <input type="hidden" name="slug" value="{{ old('slug', $slug ?? '') }}">
                                     <div class="messages"></div>
+
                                     <div class="row">
                                         <div class="col-md-6">
                                             <div class="form-group">
+                                                <label for="form_name_fname" class="form-label">First name <span class="text-danger">*</span></label>
                                                 <input id="form_name_fname" type="text" name="first_name"
-                                                    class="form-control" placeholder="First name*" required="required"
-                                                    data-error="First Name is required.">
-                                                <div class="help-block with-errors"></div>
+                                                    class="form-control @error('first_name') is-invalid @enderror"
+                                                    placeholder="e.g. John" value="{{ old('first_name') }}" required
+                                                    maxlength="100" autocomplete="given-name">
+                                                @error('first_name')
+                                                    <div class="invalid-feedback">{{ $message }}</div>
+                                                @enderror
                                             </div>
                                         </div>
                                         <div class="col-md-6">
                                             <div class="form-group">
+                                                <label for="form_name_lname" class="form-label">Last name <span class="text-danger">*</span></label>
                                                 <input id="form_name_lname" type="text" name="last_name"
-                                                    class="form-control" placeholder="Last name*" required="required"
-                                                    data-error="Last Name is required.">
-                                                <div class="help-block with-errors"></div>
+                                                    class="form-control @error('last_name') is-invalid @enderror"
+                                                    placeholder="e.g. Smith" value="{{ old('last_name') }}" required
+                                                    maxlength="100" autocomplete="family-name">
+                                                @error('last_name')
+                                                    <div class="invalid-feedback">{{ $message }}</div>
+                                                @enderror
                                             </div>
                                         </div>
                                     </div>
@@ -149,85 +157,117 @@
                                     <div class="row">
                                         <div class="col-md-6">
                                             <div class="form-group">
-                                                <input id="form_name_number" type="text" name="phone"
-                                                    class="form-control" placeholder="+92-------*" required="required"
-                                                    data-error="Phone is required.">
-                                                <div class="help-block with-errors"></div>
-                                            </div>
-                                        </div>
-                                        <div class="col-md-6">
-                                            <div class="form-group">
-                                                <select name="account_type" id="" class="form-control">
-                                                    <option value="">Select Account Type</option>
-                                                    <option value="personal">Personal</option>
-                                                    <option value="business">Business</option>
-                                                </select>
-                                                {{-- <input id="form_name" type="text" name="last_name"
-                                                    class="form-control" placeholder="Last name" required="required"
-                                                    data-error="Last Name is required."> --}}
-                                                <div class="help-block with-errors"></div>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div class="row">
-                                        <div class="col-md-6">
-                                            <div class="form-group">
+                                                <label for="form_name_email" class="form-label">Email address <span class="text-danger">*</span></label>
                                                 <input id="form_name_email" type="email" name="email"
-                                                    class="form-control" placeholder="email@mail.com*"
-                                                    required="required" data-error="Email is required.">
-                                                <div class="help-block with-errors"></div>
+                                                    class="form-control @error('email') is-invalid @enderror"
+                                                    placeholder="e.g. john.smith@example.com" value="{{ old('email') }}"
+                                                    required maxlength="255" autocomplete="email">
+                                                @error('email')
+                                                    <div class="invalid-feedback">{{ $message }}</div>
+                                                @enderror
                                             </div>
                                         </div>
                                         <div class="col-md-6">
                                             <div class="form-group">
-                                                <input id="referral_code" type="text" name="referral_code"
-                                                    class="form-control"
-                                                    placeholder="Referral code of who referred you."
-                                                    {{-- if in Url referral_code write here in value else null --}} value="{{ request('referral_code') }}">
-                                                <div class="help-block with-errors"></div>
+                                                <label for="form_name_number" class="form-label">Phone number <span class="text-danger">*</span></label>
+                                                <input id="form_name_number" type="tel" name="phone"
+                                                    class="form-control @error('phone') is-invalid @enderror"
+                                                    placeholder="e.g. +44 7700 900123 or 07700900123" value="{{ old('phone') }}"
+                                                    required maxlength="20" autocomplete="tel">
+                                                <small class="form-text text-muted">UK or international format</small>
+                                                @error('phone')
+                                                    <div class="invalid-feedback">{{ $message }}</div>
+                                                @enderror
                                             </div>
                                         </div>
                                     </div>
+
                                     <div class="row">
                                         <div class="col-md-6">
                                             <div class="form-group">
-                                                <input id="form_password" type="password" name="password"
-                                                    class="form-control" placeholder="Password*" required="required"
-                                                    data-error="password is required.">
-                                                <div class="help-block with-errors"></div>
+                                                <label for="account_type" class="form-label">Account type <span class="text-danger">*</span></label>
+                                                <select name="account_type" id="account_type" class="form-control @error('account_type') is-invalid @enderror" required>
+                                                    <option value="">Select account type</option>
+                                                    <option value="personal" {{ old('account_type') === 'personal' ? 'selected' : '' }}>Personal</option>
+                                                    <option value="business" {{ old('account_type') === 'business' ? 'selected' : '' }}>Business</option>
+                                                </select>
+                                                @error('account_type')
+                                                    <div class="invalid-feedback">{{ $message }}</div>
+                                                @enderror
                                             </div>
                                         </div>
                                         <div class="col-md-6">
-                                            <div class="form-group_password">
-                                                <input id="form_password1" type="password"
-                                                    name="password_confirmation" class="form-control"
-                                                    placeholder="Confirm Password*" required="required"
-                                                    data-error="Conform Password is required.">
-                                                <div class="help-block with-errors"></div>
+                                            <div class="form-group">
+                                                <label for="referral_code" class="form-label">Referral code <span class="text-muted">(optional)</span></label>
+                                                <input id="referral_code" type="text" name="referral_code"
+                                                    class="form-control" placeholder="If you have a referral code"
+                                                    value="{{ old('referral_code', request('referral_code')) }}" maxlength="50">
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <div class="form-group">
+                                                <label for="form_password" class="form-label">Password <span class="text-danger">*</span></label>
+                                                <input id="form_password" type="password" name="password"
+                                                    class="form-control @error('password') is-invalid @enderror"
+                                                    placeholder="Min 8 characters" required autocomplete="new-password">
+                                                <small class="form-text text-muted">At least 8 characters</small>
+                                                @error('password')
+                                                    <div class="invalid-feedback">{{ $message }}</div>
+                                                @enderror
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="form-group">
+                                                <label for="form_password1" class="form-label">Confirm password <span class="text-danger">*</span></label>
+                                                <input id="form_password1" type="password" name="password_confirmation"
+                                                    class="form-control" placeholder="Confirm your password" required
+                                                    autocomplete="new-password">
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="row">
+                                        <div class="col-12">
+                                            <div class="form-group">
+                                                <label for="address" class="form-label">Address <span class="text-muted">(optional)</span></label>
+                                                <input id="address" type="text" name="address" class="form-control"
+                                                    placeholder="e.g. 123 High Street, London" value="{{ old('address') }}"
+                                                    maxlength="500" autocomplete="street-address">
                                             </div>
                                         </div>
                                     </div>
 
                                     <div class="row mt-4">
                                         <div class="col-md-12">
-                                            <div class="remember-checkbox clearfix mb-4">
+                                            <div class="remember-checkbox clearfix mb-3">
                                                 <div class="form-check">
-                                                    <input type="checkbox" class="form-check-input float-none"
-                                                        id="customCheck1" name="terms">
-                                                    <label class="form-check-label" for="customCheck1">I agree to the
-                                                        term of use and privacy policy</label>
+                                                    <input type="checkbox" class="form-check-input @error('terms') is-invalid @enderror"
+                                                        id="customCheck1" name="terms" value="1" {{ old('terms') ? 'checked' : '' }}>
+                                                    <label class="form-check-label" for="customCheck1">
+                                                        I agree to the <a href="{{ route('privacy') }}" target="_blank" rel="noopener">terms of use and privacy policy</a> <span class="text-danger">*</span>
+                                                    </label>
+                                                    @error('terms')
+                                                        <div class="invalid-feedback d-block">{{ $message }}</div>
+                                                    @enderror
                                                 </div>
+                                            </div>
+                                            <div class="form-check mb-4">
+                                                <input type="checkbox" class="form-check-input" id="marketing_consent"
+                                                    name="marketing_consent" value="1" {{ old('marketing_consent') ? 'checked' : '' }}>
+                                                <label class="form-check-label" for="marketing_consent">
+                                                    I would like to receive news and offers by email <span class="text-muted">(optional)</span>
+                                                </label>
                                             </div>
                                         </div>
                                     </div>
 
                                     <div class="row">
                                         <div class="col">
-                                            <button type="submit" class="btn btn-primary">Create Account</button>
-                                            <span class="mt-4 d-block">Have An Account ? <a
-                                                    href="{{ route('login') }}"><i>Sign
-                                                        In!</i></a></span>
+                                            <button type="submit" class="btn btn-primary">Create account</button>
+                                            <span class="mt-4 d-block">Already have an account? <a href="{{ route('login') }}"><i>Sign in</i></a></span>
                                         </div>
                                     </div>
                                 </form>

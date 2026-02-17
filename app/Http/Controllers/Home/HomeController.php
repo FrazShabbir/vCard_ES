@@ -41,17 +41,27 @@ class HomeController extends Controller
 
     public function slug(Request $request, $slug)
     {
-        $user = User::where('username', $slug)->first();
+        $user = User::with([
+            'profile.addresses.city', 'profile.addresses.state', 'profile.addresses.country',
+            'profile.primaryaddress.city', 'profile.primaryaddress.state', 'profile.primaryaddress.country',
+            'profile.socials.shortlink', 'profile.socials.platform',
+            'profile.customlinks.shortlink', 'profile.googlereview.shortlink',
+            'shop.products',
+        ])->where('username', $slug)->first();
 
         if ($user) {
+            $profile = $user->profile;
+            if (!$profile) {
+                abort(404, 'Profile not found');
+            }
             try {
-                $profile = Profile::where('user_id', $user->id)->first();
                 DB::beginTransaction();
-                if (env('APP_ENV') == 'local') {
-                    $location_info = Location::get('182.185.236.113');
-                } else {
-                    $location_info = Location::get($request->ip());
-                }
+
+                $location_id = null;
+                $location_info = config('app.env') === 'local'
+                    ? Location::get('182.185.236.113')
+                    : Location::get($request->ip());
+
                 if ($location_info != null) {
                     $findIP = Geolocation::where('user_id', $user->id)->where('ip_address', $request->ip())->first();
 
@@ -89,67 +99,54 @@ class HomeController extends Controller
                     }
 
                 }
-                $findDevice = Device::where('user_id', $user->id)->where('ip_address', $request->ip())->where('geolocation_id', $location_id)->where('device', Agent::device())->where('platform', Agent::platform())->first();
-                if (!$findDevice) {
 
-                    $deviceType = 'other';
-                    if (Agent::isDesktop()) {
-                        $deviceType = 'Desktop';
-                    } elseif (Agent::isTablet()) {
-                        $deviceType = 'Tablet';
-                    } elseif (Agent::isPhone()) {
-                        $deviceType = 'Phone';
+                if ($location_id !== null) {
+                    $findDevice = Device::where('user_id', $user->id)->where('ip_address', $request->ip())
+                        ->where('geolocation_id', $location_id)->where('device', Agent::device())->where('platform', Agent::platform())->first();
+                    if (!$findDevice) {
+                        $deviceType = Agent::isDesktop() ? 'Desktop' : (Agent::isTablet() ? 'Tablet' : (Agent::isPhone() ? 'Phone' : 'Other'));
+                        $device = Device::create([
+                            'user_id' => $user->id,
+                            'geolocation_id' => $location_id,
+                            'ip_address' => $request->ip(),
+                            'device' => Agent::device(),
+                            'device_type' => $deviceType,
+                            'platform' => Agent::platform(),
+                            'platform_version' => Agent::version(Agent::platform()),
+                            'browser' => Agent::browser(),
+                            'browser_version' => Agent::version(Agent::browser()),
+                        ]);
+                        $user->increment('reach');
+                        $is_unique_device = true;
                     } else {
-                        $deviceType = 'Other';
+                        $device = $findDevice;
+                        $is_unique_device = false;
                     }
-
-                    $device = Device::create([
+                    Engagement::create([
                         'user_id' => $user->id,
                         'geolocation_id' => $location_id,
-                        'ip_address' => $request->ip(),
-                        'device' => Agent::device(),
-                        'device_type' => $deviceType,
-                        'platform' => Agent::platform(),
-                        'platform_version' => Agent::version(Agent::platform()),
-                        'browser' => Agent::browser(),
-                        'browser_version' => Agent::version(Agent::browser()),
+                        'device_id' => $device->id,
+                        'is_unique_location' => $is_unique_location,
+                        'is_unique_device' => $is_unique_device,
                     ]);
-                    $is_unique_device = true;
-                    $user->reach = $user->reach + 1;
-                    $user->save();
-                } else {
-                    $device = $findDevice;
-                    $is_unique_device = false;
                 }
 
-                $user->count = $user->count + 1;
-                $user->save();
+                $user->increment('count');
                 DB::commit();
 
-                $engagement = new Engagement();
-                $engagement->user_id = $user->id;
-                $engagement->geolocation_id = $location_id;
-                $engagement->device_id = $device->id;
-                $engagement->is_unique_location = $is_unique_location;
-                $engagement->is_unique_device = $is_unique_device;
-                $engagement->save();
+                $profileUrl = url()->current();
+                $avatarUrl = $this->profileAvatarUrl($profile, $user);
+                $viewData = compact('user', 'profile', 'profileUrl', 'avatarUrl');
 
-                if ($profile->template_id == 1) {
-                    return view('frontend.pages.cards.templates.template1')
-                        ->with('user', $user)
-                        ->with('profile', $profile)
-                        ->with('extra_class', 'd-none');
+                if (auth()->check() && (int) auth()->user()->id === (int) $user->id && $request->filled('preview_template')) {
+                    $templateId = max(1, min(10, (int) $request->preview_template));
                 } else {
-                    return view('frontend.pages.cards.templates.template2')
-                        ->with('user', $user)
-                        ->with('profile', $profile)
-                        ->with('extra_class', 'd-none');
+                    $templateId = (int) ($profile->template_id ?? 1);
+                    $templateId = max(1, min(10, $templateId));
                 }
+                $viewName = 'frontend.pages.cards.templates.template' . $templateId;
 
-                return view('frontend.pages.cards.index')
-                    ->with('user', $user)
-                    ->with('profile', $profile)
-                    ->with('extra_class', 'd-none');
+                return view($viewName, $viewData)->with('extra_class', 'd-none');
             } catch (\Throwable $th) {
                 DB::rollback();
                 throw $th;
@@ -257,75 +254,76 @@ class HomeController extends Controller
 
     public function downloadVCard($id)
     {
-
         try {
+            $user = User::with(['profile', 'profile.socials.shortlink', 'profile.socials.platform'])->where('username', $id)->firstOrFail();
+            $profile = $user->profile;
 
-            $user = User::where('username', $id)->firstOrFail();
             $vcard = new VCard();
+            $vcard->addName($user->last_name ?? '', $user->first_name ?? '', '', '', '');
+            if ($profile) {
+                if (!empty($profile->organization)) {
+                    $vcard->addCompany($profile->organization);
+                }
+                if (!empty($profile->designation)) {
+                    $vcard->addJobtitle($profile->designation);
+                    $vcard->addRole($profile->designation);
+                }
+                if (!empty($profile->address)) {
+                    $vcard->addAddress(null, null, $profile->address, null, null, null, null);
+                }
+                if (!empty($profile->website)) {
+                    $vcard->addURL($profile->website);
+                }
+            }
+            if (!empty($user->email)) {
+                $vcard->addEmail($user->email);
+            }
+            if (!empty($user->phone)) {
+                $vcard->addPhoneNumber($user->phone, 'PREF;WORK');
+            }
+            if ($profile && $profile->relationLoaded('socials')) {
+                foreach ($profile->socials as $social) {
+                    $link = $social->shortlink?->shortlink ?? $social->shortlink?->link ?? null;
+                    if ($link) {
+                        $vcard->addURL($link, 'TYPE=' . ($social->platform->name ?? 'URL'));
+                    }
+                }
+            }
+            $avatarUrl = $profile && !empty($profile->avatar)
+                ? (str_starts_with($profile->avatar, 'http') ? $profile->avatar : url($profile->avatar))
+                : 'https://ui-avatars.com/api/?name=' . urlencode(($user->first_name ?? '') . '+' . ($user->last_name ?? '')) . '&background=0D8ABC&color=fff';
+            $vcard->addPhoto($avatarUrl);
 
-            // define variables
-            $lastname = $user->last_name;
-            $firstname = $user->first_name;
-            $additional = '';
-            $prefix = '';
-            $suffix = '';
+            $filename = preg_replace('/[^a-zA-Z0-9_-]/', '-', ($user->first_name ?? '') . '-' . ($user->last_name ?? ''));
+            $filename = substr($filename ?: 'contact', 0, 64);
+            $output = $vcard->buildVCard();
 
-            // add personal data
-            $vcard->addName($lastname, $firstname, $additional, $prefix, $suffix);
-
-            // add work data
-            $vcard->addCompany($user->organization);
-            $vcard->addJobtitle($user->designation);
-            $vcard->addRole($user->designation);
-            $vcard->addEmail($user->email);
-            $vcard->addPhoneNumber($user->phone, 'PREF;WORK');
-            // $vcard->addPhoneNumber(123456789, 'WORK');
-            $vcard->addAddress(null, null, $user->address, null, null, null, null);
-            // $vcard->addLabel('street, worktown, workpostcode Belgium');
-            $vcard->addURL($user->url);
-            if (isset($user->youtube)) {
-                $vcard->addURL('https://www.youtube.com/' . $user->youtube, 'TYPE=Youtube');
-            }
-            if (isset($user->instagram)) {
-                $vcard->addURL('https://www.instagram.com/' . $user->instagram, 'TYPE=Instagram');
-            }
-            if (isset($user->twitter)) {
-                $vcard->addURL('https://www.twitter.com/' . $user->twitter, 'TYPE=Twitter');
-            }
-            if (isset($user->facebook)) {
-                $vcard->addURL('https://www.facebook.com/' . $user->facebook, 'TYPE=Facebook');
-            }
-            if (isset($user->google)) {
-                $vcard->addURL('https://www.google.com/' . $user->google, 'TYPE=Google');
-            }
-            if (isset($user->linkedin)) {
-                $vcard->addURL('https://www.linkedin.com/' . $user->linkedin, 'TYPE=Linkedin');
-            }
-            if (isset($user->linkedin)) {
-                $vcard->addURL('https://www.linkedin.com/' . $user->linkedin, 'TYPE=Linkedin');
-            }
-            if (isset($user->tiktok)) {
-                $vcard->addURL('https://www.tiktok.com/' . $user->tiktok, 'TYPE=Tiktok');
-            }
-            if (isset($user->pinterest)) {
-                $vcard->addURL('https://www.pinterest.com/' . $user->pinterest, 'TYPE=Pinterest');
-            }
-
-            if ($user->avatar) {
-                $vcard->addPhoto(env('APP_URL') . $user->avatar);
-
-            } else {
-                $vcard->addPhoto('https://ui-avatars.com/api/?name=' . $user->first_name . '+' . $user->last_name . '&background=0D8ABC&color=fff');
-            }
-
-            return $vcard->download();
+            return response($output, 200, [
+                'Content-Type' => 'text/vcard; charset=utf-8',
+                'Content-Disposition' => 'attachment; filename="' . $filename . '.vcf"',
+                'Content-Length' => (string) strlen($output),
+                'Cache-Control' => 'no-cache, must-revalidate',
+                'Pragma' => 'public',
+            ]);
         } catch (\Throwable $th) {
-
             alert()->error('Error', 'Something went wrong!');
             return redirect()->back();
-
         }
+    }
 
+    /**
+     * Resolve profile avatar URL (local asset or external default).
+     */
+    private function profileAvatarUrl(Profile $profile, User $user): string
+    {
+        $avatar = $profile->avatar;
+        if (empty($avatar)) {
+            return 'https://ui-avatars.com/api/?name=' . urlencode($user->first_name . '+' . $user->last_name) . '&background=0D8ABC&color=fff&size=400';
+        }
+        if (str_starts_with($avatar, 'http://') || str_starts_with($avatar, 'https://')) {
+            return $avatar;
+        }
+        return asset($avatar);
     }
 
     public function shortlinkOpener($slug)

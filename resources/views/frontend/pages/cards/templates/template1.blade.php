@@ -2,9 +2,8 @@
 <html lang="en">
 
 <head>
-    <meta charset="UTF-8">
+    @include('frontend.pages.cards.partials._meta')
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ $user->full_name }}</title>
     <!-- Bootstrap -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"
         integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
@@ -18,11 +17,15 @@
         * {
             margin: 0;
             padding: 0;
+            box-sizing: border-box;
         }
 
+        html { -webkit-text-size-adjust: 100%; }
         body {
             font-family: "Poppins", sans-serif;
+            overflow-x: hidden;
         }
+        img { max-width: 100%; height: auto; }
 
         a {
             text-decoration: none;
@@ -95,6 +98,10 @@
             font-weight: 500;
             border: 1px solid #fff;
             transition: 0.3s all ease;
+            display: inline-block;
+            min-height: 44px;
+            line-height: 28px;
+            text-align: center;
         }
 
         .save-contact-btn-white:hover {
@@ -498,8 +505,8 @@
                     <div class="row align-items-center">
                         <div class="col-lg-3 col-md-3 col-12">
                             <div class="text-center">
-                                <img src="{{ asset($profile->avatar ?? 'https://ui-avatars.com/api/?name=' . $user->full_name) }}"
-                                    alt="Max Haley" class="profile-img">
+                                <img src="{{ $avatarUrl ?? asset($profile->avatar ?? 'default/avatar/default.png') }}"
+                                    alt="{{ $user->full_name }}" class="profile-img" loading="lazy">
                             </div>
                         </div>
                         <div class="col-lg-9 col-md-9 col-12">
@@ -517,31 +524,32 @@
                                                 {{ $profile->designation ?? '-' }}
                                             </p>
                                         </div>
-                                        @if ($profile->primaryaddress)
-                                            <a class="location for-mobile" href="">
-                                                <i
-                                                    class="fal fa-map-marker-alt me-2"></i>{{ $profile->primaryaddress->city->name ?? '' }}
-                                                . {{ $profile->primaryaddress->state->name ?? '' }} .
-                                                {{ $profile->primaryaddress->country->name ?? '' }}.
-                                            </a>
+                                        @if ($profile->primaryaddress && ($profile->primaryaddress->city || $profile->primaryaddress->state || $profile->primaryaddress->country))
+                                            <span class="location for-mobile">
+                                                <i class="fal fa-map-marker-alt me-2"></i>
+                                                {{ collect([$profile->primaryaddress->city?->name, $profile->primaryaddress->state?->name, $profile->primaryaddress->country?->name])->filter()->implode(', ') }}
+                                            </span>
+                                        @elseif($user->address)
+                                            <span class="location for-mobile"><i class="fal fa-map-marker-alt me-2"></i>{{ $user->address }}</span>
                                         @endif
                                     </div>
                                 </div>
                                 <div class="col-lg-6 col-md-6 col-12">
                                     <div class="text-center text-lg-end text-md-end">
                                         <a href="{{ route('downloadVCard', $user->username) }}"
-                                            class="save-contact-btn-white" target="_blank">
+                                            class="save-contact-btn-white">
                                             <i class="fal fa-cloud-download-alt me-2"></i>Save Contact
                                         </a>
+                                        @include('frontend.pages.cards.partials._nfc')
                                         @if ($profile->googlereview->count() > 0)
                                             @foreach ($profile->googlereview as $link)
-                                                <a href="{{ $link->shortlink?->shortlink }}"
-                                                    class="google-rating-button for-mobile mt-4">
-                                                    <i class="fas fa-star me-2"></i>{{ $link->name }} <img
-                                                        src="assets/images/image 8.svg" alt="">
-                                                </a>
+                                                @if ($link->shortlink && ($url = $link->shortlink->shortlink ?? $link->shortlink->link))
+                                                    <a href="{{ $url }}" target="_blank" rel="noopener noreferrer"
+                                                        class="google-rating-button for-mobile mt-4">
+                                                        <i class="fas fa-star me-2"></i>{{ $link->name }}
+                                                    </a>
+                                                @endif
                                             @endforeach
-
                                         @endif
 
 
@@ -551,13 +559,13 @@
                             <div class="row">
                                 <div class="col-6">
                                     <div class="">
-                                        @if ($profile->primaryaddress)
-                                            <a class="location for-desktop" href="">
-                                                <i
-                                                    class="fal fa-map-marker-alt me-2"></i>{{ $profile->primaryaddress->city->name ?? '' }}
-                                                . {{ $profile->primaryaddress->state->name ?? '' }} .
-                                                {{ $profile->primaryaddress->country->name ?? '' }}.
-                                            </a>
+                                        @if ($profile->primaryaddress && ($profile->primaryaddress->city || $profile->primaryaddress->state || $profile->primaryaddress->country))
+                                            <span class="location for-desktop">
+                                                <i class="fal fa-map-marker-alt me-2"></i>
+                                                {{ collect([$profile->primaryaddress->city?->name, $profile->primaryaddress->state?->name, $profile->primaryaddress->country?->name])->filter()->implode(', ') }}
+                                            </span>
+                                        @elseif($user->address)
+                                            <span class="location for-desktop"><i class="fal fa-map-marker-alt me-2"></i>{{ $user->address }}</span>
                                         @endif
                                     </div>
                                 </div>
@@ -566,11 +574,13 @@
                                     <div class="social-box for-desktop">
                                         @if ($profile->socials->count() > 0)
                                             @foreach ($profile->socials as $social)
-                                                <a href="{{ $social->shortlink?->shortlink }}" target="_blank">
-                                                    <i class="{{ $social->platform->icon }}"></i>
-                                                    {{-- <img src="assets/images/fa6-brands_square-x-twitter.svg" alt=""> --}}
+                                                @php $socialUrl = $social->shortlink?->shortlink ?? $social->shortlink?->link; @endphp
+                                                @if ($socialUrl)
+                                                <a href="{{ $socialUrl }}" target="_blank" rel="noopener noreferrer" aria-label="{{ $social->name ?? 'Social link' }}">
+                                                    <i class="{{ $social->platform->icon ?? 'fas fa-link' }}"></i>
                                                 </a>
-                                            @endforeach
+                                                @endif
+                                                @endforeach
                                         @endif
                                         {{-- <a href="">
                                             <img src="assets/images/devicon_linkedin.svg" alt="">
@@ -600,14 +610,15 @@
                                 About Me
                             </h2>
                             <p class="description">
-                                {{ $profile->bio ?? 'Hello' }}
+                                {{ $profile->bio ?: 'No description yet.' }}
                             </p>
                             @if ($profile->googlereview->count() > 0)
                                 @foreach ($profile->googlereview as $link)
-                                    <a href="" class="google-rating-button for-desktop">
-                                        <i class="fas fa-star me-2"></i>Review {{ $link->name }} <img
-                                            src="assets/images/image 8.svg" alt="">
+                                    @if ($link->shortlink && ($url = $link->shortlink->shortlink ?? $link->shortlink->link))
+                                    <a href="{{ $url }}" target="_blank" rel="noopener noreferrer" class="google-rating-button for-desktop">
+                                        <i class="fas fa-star me-2"></i>Review {{ $link->name }}
                                     </a>
+                                    @endif
                                 @endforeach
                             @endif
                         </div>
@@ -626,14 +637,16 @@
 
                                     <div class="row">
                                         @foreach ($profile->customlinks as $link)
+                                            @if ($link->shortlink && ($linkUrl = $link->shortlink->shortlink ?? $link->shortlink->link))
                                             <div class="col-lg-3 col-md-3 col-12">
                                                 <div>
-                                                    <a href="{{ $link->shortlink->shortlink }}"
+                                                    <a href="{{ $linkUrl }}" target="_blank" rel="noopener noreferrer"
                                                         class="check-me-out-link">
-                                                        <i class="fal fa-globe me-2"></i> {{ $link->name ?? '' }}
+                                                        <i class="fal fa-globe me-2"></i> {{ $link->name ?? 'Link' }}
                                                     </a>
                                                 </div>
                                             </div>
+                                            @endif
                                         @endforeach
 
                                     </div>
@@ -772,10 +785,12 @@
                                 <div class="social-box">
                                     @if ($profile->socials->count() > 0)
                                         @foreach ($profile->socials as $social)
-                                            <a href="{{ $social->shortlink?->shortlink }}" target="_blank">
-                                                <i class="{{ $social->platform->icon }}"></i>
-                                                {{-- <img src="assets/images/fa6-brands_square-x-twitter.svg" alt=""> --}}
+                                            @php $mUrl = $social->shortlink?->shortlink ?? $social->shortlink?->link; @endphp
+                                            @if ($mUrl)
+                                            <a href="{{ $mUrl }}" target="_blank" rel="noopener noreferrer" aria-label="{{ $social->name ?? 'Social' }}">
+                                                <i class="{{ $social->platform->icon ?? 'fas fa-link' }}"></i>
                                             </a>
+                                            @endif
                                         @endforeach
                                     @endif
                                 </div>
@@ -785,13 +800,13 @@
                 </div>
             @endif
 
+            @include('frontend.pages.cards.partials._shop')
+
             <footer class="p-3">
                 <p>
-                    Powered by <a href="">{{ config('app.name') }}</a>
+                    Powered by <a href="{{ route('home') }}" rel="noopener">{{ config('app.name') }}</a>
                 </p>
-                <p>For custom website building or customization, contact us. <a
-                        href="https://wa.me/447561498786">Whatsapp</a></p>
-
+                <p class="mb-0">For custom website building or customization, contact us. <a href="https://wa.me/447561498786" target="_blank" rel="noopener noreferrer">WhatsApp</a></p>
             </footer>
         </div>
     </div>

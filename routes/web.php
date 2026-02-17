@@ -27,6 +27,9 @@ Route::get('about', [HomeController::class, 'about'])->name('about');
 Route::get('contact', [HomeController::class, 'contact'])->name('contact');
 Route::get('privacy', [HomeController::class, 'privacy'])->name('privacy');
 
+Route::get('/import-world-data', [PublicImportController::class, 'index'])->name('import.world.data');
+Route::post('/import-world-data', [PublicImportController::class, 'runImport'])->name('import.world.data.run');
+
 Route::get('/contact', [HomeController::class, 'contact'])->name('contact');
 Route::get('/user/login', [HomeController::class, 'userLogin'])->name('login.user')->middleware('guest');
 
@@ -67,8 +70,6 @@ Route::get('register', function () {
         return redirect()->route('login');
     }
 })->name('check.register');
-
-Route::get('/import-world-data', [PublicImportController::class, 'importWorldData'])->name('import.world.data');
 
 Route::group(["prefix" => "dashboard/ajax"], function () {
     Route::get('/get-regions', [App\Http\Controllers\Ajax\AjaxController::class, 'getRegions'])->name('get.regions');

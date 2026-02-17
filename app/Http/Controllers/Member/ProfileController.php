@@ -17,6 +17,32 @@ class ProfileController extends Controller
         return view('user.profile.index')
             ->with('addresses', $addresses);
     }
+
+    public function template()
+    {
+        $currentTemplateId = (int) (auth()->user()->profile->template_id ?? 1);
+        $currentTemplateId = max(1, min(10, $currentTemplateId));
+        $username = auth()->user()->username;
+        $previewBaseUrl = url($username);
+        return view('user.profile.template', [
+            'currentTemplateId' => $currentTemplateId,
+            'previewBaseUrl' => $previewBaseUrl,
+        ]);
+    }
+
+    public function templateSave(Request $request)
+    {
+        $request->validate([
+            'template_id' => 'required|integer|min:1|max:10',
+        ]);
+        $profile = Profile::where('user_id', auth()->id())->first();
+        if ($profile) {
+            $profile->template_id = (int) $request->template_id;
+            $profile->save();
+        }
+        alert()->success('Template updated. Your public card will use the selected design.', 'Success');
+        return redirect()->route('user.profile.template');
+    }
     public function myProfileSave(Request $request)
     {
         try {

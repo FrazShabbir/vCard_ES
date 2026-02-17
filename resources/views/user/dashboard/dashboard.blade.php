@@ -65,7 +65,7 @@
                                         </div>
                                         <div class="iq-text">
                                             <h6 class="text-white">Devices</h6>
-                                            <h3 class="text-white">{{ auth()->user()->devices()->count() }}</h3>
+                                            <h3 class="text-white">{{ $device_total }}</h3>
                                         </div>
                                     </div>
                                 </div>
@@ -82,7 +82,7 @@
                                         </div>
                                         <div class="iq-text">
                                             <h6 class="text-white">Locations</h6>
-                                            <h3 class="text-white">{{ auth()->user()->locations()->count() }}</h3>
+                                            <h3 class="text-white">{{ $locations_total }}</h3>
                                         </div>
                                     </div>
                                 </div>
@@ -197,7 +197,7 @@
                                 </p>
                                 @foreach ($locationsNames as $location => $count)
                                     @php
-                                        $percentage = ($count / $locations_total) * 100;
+                                        $percentage = $locations_total > 0 ? ($count / $locations_total) * 100 : 0;
                                     @endphp
 
                                     <div class="row">
@@ -262,7 +262,7 @@
                                 </p>
                                 @foreach ($platforms as $platform => $count)
                                     @php
-                                        $percentage = ($count / $platform_total) * 100;
+                                        $percentage = $platform_total > 0 ? ($count / $platform_total) * 100 : 0;
                                     @endphp
 
                                     <div class="row">
@@ -316,11 +316,11 @@
                                     @endforeach
                                 </div>
                                 <p class="mt-2">
-                                    Total number of records: {{ $platform_total }}
+                                    Total number of records: {{ $client_total }}
                                 </p>
                                 @foreach ($clients as $client => $count)
                                     @php
-                                        $percentage = ($count / $client_total) * 100;
+                                        $percentage = $client_total > 0 ? ($count / $client_total) * 100 : 0;
                                     @endphp
                                     <div class="row">
                                         <div class="col-2">
@@ -356,15 +356,7 @@
                                 <div class="progress">
                                     @foreach ($devices_percentages as $device => $percentage)
                                         @php
-                                            // Dynamically generate color classes
-                                            $colorClasses = [
-                                                'bg-success',
-                                                'bg-info',
-                                                'bg-warning',
-                                                'bg-danger',
-                                                'bg-secondary',
-                                                'bg-dark',
-                                            ];
+                                            $colorClasses = ['bg-success', 'bg-info', 'bg-warning', 'bg-danger', 'bg-secondary', 'bg-dark'];
                                             $colorClass = $colorClasses[$loop->index % count($colorClasses)];
                                         @endphp
                                         <div class="progress-bar {{ $colorClass }}" role="progressbar"
@@ -375,13 +367,13 @@
                                     @endforeach
                                 </div>
                                 <p class="mt-2">
-                                    Total number of records: {{ $platform_total }}
+                                    Total number of records: {{ $device_total }}
                                 </p>
                                 @foreach ($devices_count as $device => $count)
                                     @php
-                                        $percentage = ($count / $device_total) * 100;
+                                        $percentage = $device_total > 0 ? ($count / $device_total) * 100 : 0;
                                     @endphp
-                                    <d class="row">
+                                    <div class="row">
                                         <div class="col-2">
                                             {{ $device }}
                                         </div>
@@ -396,70 +388,11 @@
                                                 </div>
                                             </div>
                                         </div>
-                                    </d iv>
+                                    </div>
                                 @endforeach
                             </div>
                         </div>
                     </div>
-
-                    <div class="col-6">
-                        <div class="iq-card">
-                            <div class="iq-card-header d-flex justify-content-between">
-                                <div class="iq-header-title">
-                                    <h4 class="card-title">Devices Statistics</h4>
-                                </div>
-                            </div>
-                            <div class="iq-card-body">
-
-                                <div class="progress">
-                                    @foreach ($devices_percentages as $device => $percentage)
-                                        @php
-                                            // Dynamically generate color classes
-                                            $colorClasses = [
-                                                'bg-success',
-                                                'bg-info',
-                                                'bg-warning',
-                                                'bg-danger',
-                                                'bg-secondary',
-                                                'bg-dark',
-                                            ];
-                                            $colorClass = $colorClasses[$loop->index % count($colorClasses)];
-                                        @endphp
-                                        <div class="progress-bar {{ $colorClass }}" role="progressbar"
-                                            style="width: {{ $percentage }}%" aria-valuenow="{{ $percentage }}"
-                                            aria-valuemin="0" aria-valuemax="100">
-                                            ({{ round($percentage, 2) }}%)
-                                        </div>
-                                    @endforeach
-                                </div>
-                                <p class="mt-2">
-                                    Total number of records: {{ $platform_total }}
-                                </p>
-                                @foreach ($devices_count as $device => $count)
-                                    @php
-                                        $percentage = ($count / $device_total) * 100;
-                                    @endphp
-                                    <d class="row">
-                                        <div class="col-2">
-                                            {{ $device }}
-                                        </div>
-                                        <div class="col-10">
-                                            <div class="progress mb-3">
-                                                <div class="progress-bar bg-primary" role="progressbar"
-                                                    style="width: {{ $percentage }}%;"
-                                                    aria-valuenow="{{ $percentage }}" aria-valuemin="0"
-                                                    aria-valuemax="100">
-                                                    {{ $count }} records -
-                                                    {{ round($percentage, 2) }}%
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </d iv>
-                                @endforeach
-                            </div>
-                        </div>
-                    </div>
-
 
                     <div class="col-6">
                         <div class="iq-card">
@@ -477,10 +410,8 @@
                                 @foreach ($socialLinks as $socialLink)
                                     @if ($socialLink->shortlink)
                                         @php
-                                            // dd($linksCount);
                                             $count = $socialLink->shortlink->count;
-                                            $percentage = ($count / $linksCount) * 100;
-                                            // dd($percentage);
+                                            $percentage = $linksCount > 0 ? ($count / $linksCount) * 100 : 0;
                                         @endphp
                                         <div class="row mb-3">
                                             <div class="col-2">

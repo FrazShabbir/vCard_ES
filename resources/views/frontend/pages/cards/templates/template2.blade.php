@@ -2,9 +2,8 @@
 <html lang="en">
 
 <head>
-    <meta charset="UTF-8">
+    @include('frontend.pages.cards.partials._meta')
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ $user->full_name }} - vCard</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta2/css/all.min.css" />
     <style>
@@ -195,6 +194,22 @@
             color: #1F8AFF;
             font-weight: 600;
         }
+        * { box-sizing: border-box; }
+        html { -webkit-text-size-adjust: 100%; }
+        body { overflow-x: hidden; }
+        .container { max-width: 100%; padding-left: 1rem; padding-right: 1rem; }
+        img { max-width: 100%; height: auto; }
+        .btn { min-height: 44px; display: inline-flex; align-items: center; justify-content: center; padding: 0.6rem 1.25rem; }
+        @media (max-width: 768px) {
+            .banner { height: 220px; font-size: 1.5rem; background-size: 100% 220px; }
+            .profile-pic { width: 120px; height: 120px; top: 160px; }
+            .info { padding: 1rem; }
+            .product { width: 100%; max-width: 280px; margin: 0.75rem auto; display: block; }
+        }
+        @media (max-width: 480px) {
+            .container.mt-2 { margin-top: 0.5rem !important; }
+            .col-md-6 { padding: 0 0.5rem; }
+        }
     </style>
 </head>
 
@@ -205,34 +220,40 @@
                 <div class="banner">
                     <h1>Contact Card</h1>
                     <div class="profile-pic">
-                        <img src="{{ asset($profile->avatar ?? 'https://ui-avatars.com/api/?name=' . $user->full_name) }}   "
-                            alt="Profile Picture" class="img-fluid">
+                        <img src="{{ $avatarUrl ?? asset($profile->avatar ?? 'default/avatar/default.png') }}"
+                            alt="{{ $user->full_name }}" class="img-fluid" loading="lazy">
                     </div>
                 </div>
                 <div class="info">
-                    <h2> {{ getFullNameById($user->id) }}</h2>
-                    <p> {{ $profile->organization }} {{ $profile->designation }}</p>
-                    @if ($profile->primaryaddress)
-                        <p>{{ $profile->primaryaddress->city->name ?? '' }} <i class="fal fa-circle"></i>
-                            {{ $profile->primaryaddress->state->name ?? '' }} <i class="fal fa-circle"></i>
-                            {{ $profile->primaryaddress->country->name ?? '' }}</p>
+                    <h2>{{ $user->full_name }}</h2>
+                    @if ($profile->organization || $profile->designation)
+                        <p>{{ $profile->organization }}{{ $profile->organization && $profile->designation ? ' · ' : '' }}{{ $profile->designation }}</p>
                     @endif
-                    <p><a href="mailto:{{ $user->email }}">{{ $user->email }}</a></p>
-                    <p>{{ $profile->bio ?? 'Hello' }}</p>
+                    @if ($profile->primaryaddress && ($profile->primaryaddress->city || $profile->primaryaddress->state || $profile->primaryaddress->country))
+                        <p>{{ collect([$profile->primaryaddress->city?->name, $profile->primaryaddress->state?->name, $profile->primaryaddress->country?->name])->filter()->implode(' · ') }}</p>
+                    @elseif($user->address)
+                        <p>{{ $user->address }}</p>
+                    @endif
+                    @if ($user->email)
+                        <p><a href="mailto:{{ $user->email }}">{{ $user->email }}</a></p>
+                    @endif
+                    <p>{{ $profile->bio ?: 'No description yet.' }}</p>
 
                     <div class="text-center">
-                        <a href="{{ route('downloadVCard', $user->username) }}" class="btn btn-block btn-primary">Save
-                            Contact</a>
+                        <a href="{{ route('downloadVCard', $user->username) }}" class="btn btn-block btn-primary">Save Contact</a>
+                        @include('frontend.pages.cards.partials._nfc')
                     </div>
                 </div>
                 <div class="social-media my-3">
-                    @if ($profile->socials->count()>0)
-
-                    @foreach ($profile->socials as $social)
-                        <a href="{{ $social->shortlink?->shortlink }}" target="_blank">
-                            <i class="{{ $social->platform->icon }}"></i>
-                        </a>
-                    @endforeach
+                    @if ($profile->socials->count() > 0)
+                        @foreach ($profile->socials as $social)
+                            @php $sUrl = $social->shortlink?->shortlink ?? $social->shortlink?->link; @endphp
+                            @if ($sUrl)
+                            <a href="{{ $sUrl }}" target="_blank" rel="noopener noreferrer" aria-label="{{ $social->name ?? 'Social' }}">
+                                <i class="{{ $social->platform->icon ?? 'fas fa-link' }}"></i>
+                            </a>
+                            @endif
+                        @endforeach
                     @endif
                 </div>
 
@@ -241,71 +262,15 @@
         </div>
 
     </div>
-    <div class="container ">
-        <div class="row ">
-            <div class="col-12">
-                <div class="card shop">
-                    <div class="card-body ">
-                        <div class="row text-center">
-                            <div class="col-md-12 text-center">
-                                <h2 class="shop-title">Our Shop</h2>
-                                <p class="shop-description">Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed
-                                    sit amet nulla
-                                    auctor, vestibulum magna sed, convallis ex.</p>
-                            </div>
-                            <div class="col-md-3">
-                                <div class="product">
-                                    <img src="https://via.placeholder.com/250x350" alt="Product 1">
-                                    <div class="product-info">
-                                        <h3>Product 1</h3>
-                                        <p>$100</p>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="col-md-3">
-                                <div class="product">
-                                    <img src="https://via.placeholder.com/250x350" alt="Product 2">
-                                    <div class="product-info">
-                                        <h3>Product 2</h3>
-                                        <p>$200</p>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="col-md-3">
-                                <div class="product">
-                                    <img src="https://via.placeholder.com/250x350" alt="Product 3">
-                                    <div class="product-info">
-                                        <h3>Product 3</h3>
-                                        <p>$300</p>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="col-md-3">
-                                <div class="product">
-                                    <img src="https://via.placeholder.com/250x350" alt="Product 4">
-                                    <div class="product-info">
-                                        <h3>Product 4</h3>
-                                        <p>$400</p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
 
-
-
-    </div>
+    @include('frontend.pages.cards.partials._shop')
 
     <footer>
         <div class="footer-box m-2">
             <p class="text">
-                Powered by <a href="">{{ config('app.name') }}</a>
+                Powered by <a href="{{ route('home') }}" rel="noopener">{{ config('app.name') }}</a>
             </p>
-            <p>For custom website building or customization, contact us. <a
-                    href="https://wa.me/447561498786">Whatsapp</a></p>
+            <p class="mb-0">For custom website building or customization, contact us. <a href="https://wa.me/447561498786" target="_blank" rel="noopener noreferrer">WhatsApp</a></p>
         </div>
     </footer>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
