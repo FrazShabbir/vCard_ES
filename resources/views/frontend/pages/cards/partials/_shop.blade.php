@@ -1,8 +1,12 @@
-@if ($user->shop && $user->shop->products->isNotEmpty())
 @php
+    $showShop = true;
+    if (isset($customization) && $customization && !$customization->show_shop) {
+        $showShop = false;
+    }
     $whatsappPhone = $user->shop->phone ?? $user->phone ?? null;
     $whatsappNumber = $whatsappPhone ? preg_replace('/\D/', '', $whatsappPhone) : '';
 @endphp
+@if ($showShop && $user->shop && $user->shop->products->isNotEmpty())
 <style>
 .profile-shop { margin:2rem auto; padding:0 1rem; max-width:900px; }
 .profile-shop-inner { background:rgba(0,0,0,.03); border-radius:16px; padding:1.5rem; }
@@ -11,6 +15,9 @@
 .profile-shop-product { background:#fff; border-radius:12px; overflow:hidden; box-shadow:0 2px 12px rgba(0,0,0,.06); transition:transform .2s; display:flex; flex-direction:column; }
 .profile-shop-product:hover { transform:translateY(-2px); }
 .profile-shop-product img { width:100%; aspect-ratio:1; object-fit:cover; display:block; }
+.profile-shop-slider { position:relative; width:100%; overflow:hidden; }
+.profile-shop-slider img { width:100%; aspect-ratio:1; object-fit:cover; display:none; }
+.profile-shop-slider img.is-active { display:block; }
 .profile-shop-product-info { padding:.75rem; flex:1; display:flex; flex-direction:column; }
 .profile-shop-product-info h3 { font-size:.9rem; font-weight:600; margin:0 0 .25rem; line-height:1.3; }
 .profile-shop-price { font-size:.85rem; color:#555; margin:0 0 .5rem; }
@@ -50,17 +57,34 @@
 .profile-shop-cart-sidebar-total { font-size:1rem; font-weight:700; margin-bottom:.75rem; }
 .profile-shop-cart-sidebar-empty { padding:2rem 1.25rem; text-align:center; color:#888; font-size:.9rem; }
 </style>
-<section class="profile-shop" id="profile-shop" data-wa-number="{{ $whatsappNumber }}" data-shop-name="{{ $user->shop->name ?: 'Shop' }}">
+<section class="profile-shop" id="profile-shop"
+    data-wa-number="{{ $whatsappNumber }}"
+    data-shop-name="{{ $user->shop->name ?: 'Shop' }}"
+    data-card-url="{{ url($user->username) }}"
+    data-shop-key="shop-cart-{{ $user->id }}">
     <div class="profile-shop-inner">
         <h2 class="profile-shop-title">{{ $user->shop->name ?: 'Our Shop' }}</h2>
+        @if(!$whatsappNumber)
+            <p class="text-center text-muted small mb-3">Orders via WhatsApp are unavailable until the shop owner adds a phone number.</p>
+        @endif
         <div class="profile-shop-grid">
             @foreach ($user->shop->products as $product)
                 @php
                     $price = $product->sale_price ?: $product->original_price;
+                    $images = $product->images ?? collect();
+                    $primaryImage = $images->first()->path ?? $product->image;
+                    $primaryImageUrl = $primaryImage ? asset($primaryImage) : 'https://via.placeholder.com/300x300?text=No+image';
                 @endphp
-                @php $imgSrc = $product->image ? asset($product->image) : 'https://via.placeholder.com/300x300?text=No+image'; @endphp
-                <div class="profile-shop-product" data-product-id="{{ $product->id }}" data-product-name="{{ $product->name }}" data-product-price="{{ $price }}" data-product-image="{{ $imgSrc }}">
-                    <img src="{{ $imgSrc }}" alt="{{ $product->name }}" loading="lazy">
+                <div class="profile-shop-product" data-product-id="{{ $product->id }}" data-product-name="{{ $product->name }}" data-product-price="{{ $price }}" data-product-image="{{ $primaryImageUrl }}">
+                    @if($images->isNotEmpty())
+                        <div class="profile-shop-slider" data-product-id="{{ $product->id }}">
+                            @foreach($images as $img)
+                                <img src="{{ asset($img->path) }}" alt="{{ $product->name }}" loading="lazy">
+                            @endforeach
+                        </div>
+                    @else
+                        <img src="{{ $primaryImageUrl }}" alt="{{ $product->name }}" loading="lazy">
+                    @endif
                     <div class="profile-shop-product-info">
                         <h3>{{ Str::limit($product->name, 30) }}</h3>
                         <p class="profile-shop-price">
@@ -113,12 +137,22 @@
 
 <script>
 (function() {
-    var cart = {};
     var shopEl = document.getElementById('profile-shop');
+    var cartKey = (shopEl && shopEl.getAttribute('data-shop-key')) || 'shop-cart';
+    var cart = {};
+    try {
+        cart = JSON.parse(localStorage.getItem(cartKey) || '{}') || {};
+    } catch (e) { cart = {}; }
+
+    function persistCart() {
+        try { localStorage.setItem(cartKey, JSON.stringify(cart)); } catch (e) {}
+    }
+
     var bar = document.getElementById('profile-shop-cart-bar');
     var summary = document.getElementById('profile-shop-cart-summary');
     var waNumber = shopEl && shopEl.getAttribute('data-wa-number');
     var shopName = shopEl && shopEl.getAttribute('data-shop-name');
+    var cardUrl = shopEl && shopEl.getAttribute('data-card-url');
     var overlay = document.getElementById('profile-shop-cart-overlay');
     var sidebar = document.getElementById('profile-shop-cart-sidebar');
     var sidebarList = document.getElementById('profile-shop-cart-sidebar-list');
@@ -129,6 +163,19 @@
     var closeBtn = document.getElementById('profile-shop-cart-close');
     var waBtnSidebar = document.getElementById('profile-shop-cart-wa');
     var waBtnBar = document.getElementById('profile-shop-cart-wa-bar');
+    // Simple image slider per product (if multiple images)
+    document.querySelectorAll('.profile-shop-slider').forEach(function(slider) {
+        var imgs = slider.querySelectorAll('img');
+        if (!imgs.length) return;
+        var index = 0;
+        imgs[0].classList.add('is-active');
+        if (imgs.length < 2) return;
+        setInterval(function() {
+            imgs[index].classList.remove('is-active');
+            index = (index + 1) % imgs.length;
+            imgs[index].classList.add('is-active');
+        }, 3500);
+    });
 
     function openSidebar() {
         if (overlay) overlay.classList.add('open');
@@ -154,12 +201,11 @@
         }
         sidebarEmpty.style.display = 'none';
         sidebarFooter.style.display = 'block';
-        sidebarTotal.textContent = 'Total: ' + total;
+        sidebarTotal.textContent = 'Total: ' + total.toFixed(2);
         var existing = sidebarList.querySelectorAll('.profile-shop-cart-sidebar-item');
         existing.forEach(function(el) { el.remove(); });
         for (var id in cart) {
             var item = cart[id];
-            var subtotal = item.qty * (parseFloat(item.price) || 0);
             var div = document.createElement('div');
             div.className = 'profile-shop-cart-sidebar-item';
             div.setAttribute('data-product-id', id);
@@ -180,6 +226,7 @@
                     cart[id].qty--;
                     if (cart[id].qty <= 0) delete cart[id];
                 }
+                persistCart();
                 updateCartUI();
             };
         });
@@ -198,7 +245,7 @@
                 bar.classList.add('visible');
                 summary.textContent = count + ' item' + (count !== 1 ? 's' : '') + ' in cart';
                 if (openBtn) openBtn.style.display = 'inline-flex';
-                if (waBtnBar) waBtnBar.style.display = 'inline-flex';
+                if (waBtnBar) waBtnBar.style.display = waNumber ? 'inline-flex' : 'none';
             } else {
                 bar.classList.remove('visible');
                 if (openBtn) openBtn.style.display = 'none';
@@ -220,24 +267,35 @@
     }
 
     function buildWhatsAppMessage() {
-        var lines = ['Hi! I would like to place an order from *' + (shopName || 'your shop') + '*', ''];
+        var lines = [
+            'Hi! I would like to place an order from *' + (shopName || 'your shop') + '*',
+            '',
+            'Card: ' + (cardUrl || ''),
+            ''
+        ];
         var total = 0;
         for (var id in cart) {
             var item = cart[id];
             var price = parseFloat(item.price) || 0;
             var subtotal = item.qty * price;
             total += subtotal;
-            lines.push('- ' + item.name + ' x ' + item.qty + ' — ' + (item.price || '') + (item.qty > 1 ? ' = ' + subtotal : ''));
+            lines.push('- ' + item.name + ' x ' + item.qty + ' @ ' + (item.price || '0') + ' = ' + subtotal.toFixed(2));
         }
         lines.push('');
-        lines.push('*Total: ' + total + '*');
+        lines.push('*Total: ' + total.toFixed(2) + '*');
+        lines.push('');
+        lines.push('Please confirm availability and delivery options.');
         return lines.join("\n");
     }
 
     function openWa() {
         var count = 0;
         for (var id in cart) count += cart[id].qty;
-        if (count === 0 || !waNumber) return;
+        if (count === 0) return;
+        if (!waNumber) {
+            alert('WhatsApp ordering is unavailable — the shop has not added a phone number yet.');
+            return;
+        }
         var text = encodeURIComponent(buildWhatsAppMessage());
         window.open('https://wa.me/' + waNumber + '?text=' + text, '_blank', 'noopener,noreferrer');
     }
@@ -253,6 +311,7 @@
             var image = row.getAttribute('data-product-image') || '';
             if (!cart[id]) cart[id] = { name: name, price: price, image: image, qty: 0 };
             cart[id].qty += 1;
+            persistCart();
             updateCartUI();
         });
     }

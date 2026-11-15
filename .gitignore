@@ -1,4 +1,8 @@
 /node_modules
+/nuxt/node_modules
+/nuxt/.nuxt
+/nuxt/.output
+/nuxt/dist
 /public/build
 /public/hot
 /public/uploads
@@ -7,6 +11,7 @@
 /vendor
 .env
 .env.backup
+/nuxt/.env
 .phpunit.result.cache
 Homestead.json
 Homestead.yaml

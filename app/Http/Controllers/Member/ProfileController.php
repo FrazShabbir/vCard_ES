@@ -20,14 +20,65 @@ class ProfileController extends Controller
 
     public function template()
     {
-        $currentTemplateId = (int) (auth()->user()->profile->template_id ?? 1);
-        $currentTemplateId = max(1, min(10, $currentTemplateId));
-        $username = auth()->user()->username;
-        $previewBaseUrl = url($username);
-        return view('user.profile.template', [
+        return redirect()->route('user.appearance', ['tab' => 'template']);
+    }
+
+    public function appearance(Request $request)
+    {
+        $profile = auth()->user()->profile;
+        $currentTemplateId = max(1, min(10, (int) ($profile->template_id ?? 1)));
+        $customizations = \App\Models\TemplateCustomization::where('user_id', auth()->id())
+            ->orderBy('is_active', 'desc')
+            ->orderBy('updated_at', 'desc')
+            ->get();
+        $activeCustomization = $customizations->where('is_active', true)->first();
+        $tab = $request->get('tab', ($profile->appearance_mode ?? 'template') === 'custom' ? 'custom' : 'template');
+
+        return view('user.appearance.index', [
             'currentTemplateId' => $currentTemplateId,
-            'previewBaseUrl' => $previewBaseUrl,
+            'previewBaseUrl' => url(auth()->user()->username),
+            'appearanceMode' => $profile->appearance_mode ?? 'template',
+            'customizations' => $customizations,
+            'activeCustomization' => $activeCustomization,
+            'tab' => in_array($tab, ['template', 'custom'], true) ? $tab : 'template',
+            'isBusiness' => auth()->user()->type === 'business',
         ]);
+    }
+
+    public function appearanceMode(Request $request)
+    {
+        $request->validate([
+            'appearance_mode' => 'required|in:template,custom',
+        ]);
+        $profile = Profile::where('user_id', auth()->id())->first();
+        if (!$profile) {
+            return redirect()->route('user.appearance');
+        }
+        $mode = $request->appearance_mode;
+        if ($mode === 'custom') {
+            $customization = \App\Models\TemplateCustomization::getActiveForUser(auth()->id())
+                ?: \App\Models\TemplateCustomization::where('user_id', auth()->id())->orderByDesc('updated_at')->first();
+            if (!$customization) {
+                alert()->error('Create a custom design first, then activate it.', 'Error');
+                return redirect()->route('user.appearance', ['tab' => 'custom']);
+            }
+            if (!$customization->is_active) {
+                $customization->activate();
+            }
+            $profile->customization_id = $customization->id;
+            $profile->appearance_mode = 'custom';
+            $profile->save();
+            alert()->success('Live card now uses your custom design.', 'Success');
+            return redirect()->route('user.appearance', ['tab' => 'custom']);
+        }
+
+        $profile->appearance_mode = 'template';
+        $profile->save();
+        \App\Models\TemplateCustomization::where('user_id', auth()->id())
+            ->where('is_active', true)
+            ->update(['is_active' => false]);
+        alert()->success('Live card now uses your selected template.', 'Success');
+        return redirect()->route('user.appearance', ['tab' => 'template']);
     }
 
     public function templateSave(Request $request)
@@ -38,13 +89,26 @@ class ProfileController extends Controller
         $profile = Profile::where('user_id', auth()->id())->first();
         if ($profile) {
             $profile->template_id = (int) $request->template_id;
+            $profile->appearance_mode = 'template';
             $profile->save();
         }
-        alert()->success('Template updated. Your public card will use the selected design.', 'Success');
-        return redirect()->route('user.profile.template');
+        \App\Models\TemplateCustomization::where('user_id', auth()->id())
+            ->where('is_active', true)
+            ->update(['is_active' => false]);
+
+        alert()->success('Template updated. Your public card will use the selected template.', 'Success');
+        return redirect()->route('user.appearance', ['tab' => 'template']);
     }
+
     public function myProfileSave(Request $request)
     {
+        $rules = [];
+        if (auth()->user()->type === 'business') {
+            $rules['organization'] = 'required|string|max:255';
+            $rules['designation'] = 'required|string|max:255';
+        }
+        $request->validate($rules);
+        
         try {
             db::beginTransaction();
             $user = User::find(auth()->user()->id);

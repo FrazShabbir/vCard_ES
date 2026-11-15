@@ -8,17 +8,28 @@ use Illuminate\Http\Request;
 class CheckProfile
 {
     /**
-     * Handle an incoming request.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @param  \Closure(\Illuminate\Http\Request): (\Illuminate\Http\Response|\Illuminate\Http\RedirectResponse)  $next
-     * @return \Illuminate\Http\Response|\Illuminate\Http\RedirectResponse
+     * Soft gate: nudge incomplete member profiles through onboarding
+     * before accessing secondary features (shop, physical card, etc.).
      */
     public function handle(Request $request, Closure $next)
     {
-        if (auth()->user()) {
-            if (!auth()->user()->profile->bio or !auth()->user()->profile->organization and !auth()->user()->profile->address) {
-                return redirect()->route('user.profile');
+        $user = auth()->user();
+        if (!$user || !$user->profile) {
+            return $next($request);
+        }
+
+        if ($request->session()->get('onboarding_completed')) {
+            return $next($request);
+        }
+
+        $profile = $user->profile;
+        $hasBio = filled($profile->bio);
+        $hasOrgOrAddress = filled($profile->organization) || filled($profile->address);
+
+        if (!$hasBio || !$hasOrgOrAddress) {
+            if (!$request->routeIs('user.onboarding*') && !$request->routeIs('user.profile*')) {
+                return redirect()->route('user.onboarding')
+                    ->with('info', 'Finish a few setup steps to get the most from your card.');
             }
         }
 

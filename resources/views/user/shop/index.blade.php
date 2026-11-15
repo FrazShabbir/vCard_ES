@@ -82,8 +82,7 @@
                                     <div class="col-12">
                                         <button type="button" class="btn btn-primary" data-toggle="modal"
                                             data-target=".bd-update-shop">Update Shop Details</button>
-                                        <button type="button" class="btn btn-primary" data-toggle="modal"
-                                            data-target=".bd-inventory-upload">Add Inventory</button>
+                                        <a href="{{ route('user.product.create') }}" class="btn btn-primary">Add Inventory</a>
                                     </div>
                                 </div>
                             @endif
@@ -132,10 +131,10 @@
                                                     <tr>
                                                         <td>{{ $p->name }}</td>
                                                         <td><del>{{ $p->original_price }}</del> {{ $p->sale_price }}</td>
-                                                        <td>{{ $p->description }}</td>
-                                                        <td><button class="btn btn-primary btn-sm edit-product"
-                                                                onclick="viewData('{{ $p->slug }}')">Edit</button>
-                                                        </td>
+                                                    <td>{{ $p->description }}</td>
+                                                    <td>
+                                                        <a href="{{ route('user.product.edit', $p->slug) }}" class="btn btn-primary btn-sm">Edit</a>
+                                                    </td>
                                                     </tr>
                                                 @endforeach
 
@@ -299,7 +298,7 @@
         <div class="modal fade bd-inventory-upload" tabindex="-1" role="dialog" style="display: none;"
             aria-hidden="true">
             <div class="modal-dialog modal-lg">
-                <form action="{{ route('user.product.store') }}" method="POST">
+                <form action="{{ route('user.product.store') }}" method="POST" enctype="multipart/form-data">
                     @csrf
                     <div class="modal-content">
                         <div class="modal-header">
@@ -336,14 +335,11 @@
                             </div>
                             <div class="row">
                                 <div class="col-md-12 col-sm-12 mb-3">
-                                    <div class="form-group">
-                                        <div class="custom-file">
-                                            <input type="file" class="custom-file-input" id="image">
-                                            <label class="custom-file-label" for="image">Choose Product Image</label>
-                                        </div>
-                                    </div>
+                                    <label for="product-images" class="required">Product images</label>
+                                    <input type="file" class="filepond" id="product-images" name="images[]" multiple
+                                        accept="image/*">
+                                    <small class="form-text text-muted">You can upload multiple images. First image will be used as the main thumbnail.</small>
                                 </div>
-
                             </div>
                         </div>
                         <div class="modal-footer">
@@ -370,24 +366,28 @@
 
     <script>
         function viewData(id) {
-            $.ajax({
-                type: "GET",
-                url: "{{ route('user.product.edit') }}",
-                data: {
-                    id: id
-                },
-                success: function(response) {
-                    $('#paste-product').html(response);
-                    $('#bd-inventory-edit').modal('show');
-                },
-                error: function(xhr, status, error) {
-                    console.error(error);
-                }
-            });
+            // legacy function no longer used; kept to avoid JS errors
         }
     </script>
 
 @endsection
 
 @push('js')
+    {{-- FilePond for product images --}}
+    <script src="https://unpkg.com/filepond@^4/dist/filepond.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            if (window.FilePond) {
+                var inputs = document.querySelectorAll('input.filepond[name="images[]"]');
+                Array.prototype.forEach.call(inputs, function(input) {
+                    FilePond.create(input, {
+                        allowMultiple: true,
+                        credits: false,
+                        allowReorder: true,
+                        labelIdle: 'Drop product images here or <span class="filepond--label-action">Browse</span>',
+                    });
+                });
+            }
+        });
+    </script>
 @endpush

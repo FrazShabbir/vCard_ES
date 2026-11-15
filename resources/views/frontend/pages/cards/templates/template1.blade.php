@@ -3,6 +3,7 @@
 
 <head>
     @include('frontend.pages.cards.partials._meta')
+    @include('frontend.pages.cards.partials._customization')
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- Bootstrap -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"
@@ -801,6 +802,7 @@
             @endif
 
             @include('frontend.pages.cards.partials._shop')
+            @include('frontend.pages.cards.partials._sections')
 
             <footer class="p-3">
                 <p>

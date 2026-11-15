@@ -36,4 +36,9 @@ class Profile extends Model
     {
         return $this->hasMany(SocialLink::class)->where('social_platform_id', 8);
     }
+
+    public function customization()
+    {
+        return $this->belongsTo(TemplateCustomization::class, 'customization_id');
+    }
 }

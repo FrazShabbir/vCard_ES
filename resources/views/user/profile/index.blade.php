@@ -97,15 +97,32 @@
 
                                 <div class="row">
                                     <div class="col-md-6 col-sm-12 mb-3">
-                                        <label for="organization">Organization</label>
+                                        <label for="organization">
+                                            {{ Auth::user()->type === 'business' ? 'Company/Organization' : 'Organization' }}
+                                            @if(Auth::user()->type === 'business')
+                                                <span class="text-danger">*</span>
+                                            @endif
+                                        </label>
                                         <input type="text" class="form-control" name="organization"
-                                            placeholder="e.g. Google" value="{{ Auth::user()->profile->organization }}">
+                                            placeholder="{{ Auth::user()->type === 'business' ? 'e.g. Your Company Name' : 'e.g. Google' }}" 
+                                            value="{{ Auth::user()->profile->organization }}"
+                                            {{ Auth::user()->type === 'business' ? 'required' : '' }}>
+                                        @if(Auth::user()->type === 'business')
+                                            <small class="form-text text-muted">Your business/company name will be prominently displayed on your vCard.</small>
+                                        @endif
                                     </div>
 
                                     <div class="col-md-6 col-sm-12 mb-3">
-                                        <label for="designation">Designation</label>
+                                        <label for="designation">
+                                            {{ Auth::user()->type === 'business' ? 'Job Title/Role' : 'Designation' }}
+                                            @if(Auth::user()->type === 'business')
+                                                <span class="text-danger">*</span>
+                                            @endif
+                                        </label>
                                         <input type="text" class="form-control" name="designation"
-                                            placeholder="e.g. Engineer" value="{{ Auth::user()->profile->designation }}">
+                                            placeholder="{{ Auth::user()->type === 'business' ? 'e.g. CEO, Manager' : 'e.g. Engineer' }}" 
+                                            value="{{ Auth::user()->profile->designation }}"
+                                            {{ Auth::user()->type === 'business' ? 'required' : '' }}>
                                     </div>
 
                                 </div>

@@ -1,0 +1,83 @@
+---
+description: vCard_ES project brain map — architecture, routes, models, customizer, fragile areas for future agent work
+alwaysApply: true
+---
+
+# vCard_ES — Project Brain Map
+
+Laravel 9 digital vCard / NFC business-card SaaS. Public cards at `/{username}`; members at `auth/member`; SuperAdmin at `admin/dashboard`.
+
+## Stack
+- Laravel 9, Spatie Permission, Breeze auth, SweetAlert, Intervention Image, QR, jeroendesloovere/vcard, stevebauman/location
+- Helpers: `app/helpers.php` via **`composer.json` → `autoload.files`** (NOT autoload-dev — production `--no-dev` must load `fromSettings()`)
+
+## URL mental model
+| Path | Purpose |
+|------|---------|
+| `/` | Marketing |
+| `/{username}` | Public vCard |
+| `/{free-slug}` | Registration if username unused |
+| `/sl/{slug}` | Shortlink redirect |
+| `/auth/login`, `/auth/register` | Auth (GET register aborts 404 — real UI via unused slug) |
+| `auth/member/*` | Member app |
+| `admin/dashboard/*` | SuperAdmin |
+
+## Roles
+- **Member** — `routes/member.php` (`role:Member`)
+- **SuperAdmin** — `routes/admin.php`
+- **Admin** — seeded; no dedicated routes in practice
+- Post-login: `check/dashboard` → role redirect (`RouteServiceProvider`, `DashboardController`)
+
+## Core domain
+- **User** — `username` = public slug; `type` = `personal|business`; shop, profile, engagements, devices, locations
+- **Profile** — bio, org, designation, avatar, cover, `template_id` (1–10 legacy), **`customization_id`**
+- **Shop → Product → ProductImage** — multi-image; public cart is **JS-only → WhatsApp** (no server cart)
+- **Order / Card** — physical NFC card orders (separate from shop)
+- **SocialLink → ShortLink + SocialPlatform** — platform 8 = Google review, 9 = custom links
+- **GeneralSetting** — via `fromSettings($key)`
+
+## Public vCard render (`HomeController::slug`)
+1. Resolve customization: `?customization_id=` (owner) → `profile.customization_id` → `TemplateCustomization::getActiveForUser`
+2. Load `CustomSection::getForUser` + team members
+3. **If customization exists** → `frontend.pages.cards.dynamic` (DB-driven blocks)
+4. **Else** → `templates/template{1–10}` (`preview_template` or `profile.template_id`)
+
+### Dynamic blocks (`cards/blocks/`)
+`profile_card`, `bio`, `social_links`, `address`, `shop`, `custom_sections`, `save_contact`, `footer`
+
+### Shared partials (`cards/partials/`)
+`_shop` (cart + WhatsApp), `_sections`, `_nfc`, `_footer`, `_meta`, `_customization` (legacy CSS)
+
+## Customizer (WordPress-style)
+- **DB:** `template_customizations` — colors/fonts columns + **`layout_json`** (`layout_blocks` accessor) + **`design_settings`** JSON
+- Also: `custom_sections`, `team_members`, `profiles.customization_id`
+- **UI:** `CustomizerController` — index, create/edit, sections, team, **`builder.blade.php`** on `customizer-layout` (full-screen, no sidebar)
+- **API:** `GET/POST auth/member/customizer/design-json/{id}` — save layout + design
+- **Activate** sets `is_active` + updates `profile.customization_id`
+- Business accounts: org/designation required on profile save; shop section recommended in UI
+
+## Critical controllers
+- `Home/HomeController` — public card + vCard download
+- `Member/CustomizerController`, `ProfileController`, `ShopController`, `SocialLinkController`, `CardController`, `StatsController`
+- `Auth/RegisteredUserController` — slug register, `assignRole('Member')`, `account_type` → `users.type`
+- `Backend/*` — users, roles, slider, orders, settings
+- `PublicImport/PublicImportController` — geo import from `public/regions.json`
+
+## Views
+- `resources/views/frontend/` — marketing + cards
+- `resources/views/user/` — member (sidebar in `partials/_sidebar`)
+- `resources/views/user/customizer-layout.blade.php` — builder shell (no sidebar)
+- `resources/views/backend/` — SuperAdmin
+
+## Fragile / watch-outs
+- Any active customization **forces dynamic view** — bypasses template 1–10 layout
+- Dual design storage: column fields vs `design_settings` / `layout_json`
+- `visual.blade.php` may be stale; route uses **`builder.blade.php`**
+- `CheckProfile` middleware commented out on member routes
+- Local geo often fakes IP in `HomeController` / registration
+- Uncommitted `2026_02_17_*` migrations must be migrated on each env
+- Shop WhatsApp needs shop/user phone; cart is client-side only
+
+## Local
+- Typical `APP_URL=http://vcards.lan` (MAMP); DB name often `vcards`
+- Never commit `.env`

@@ -206,3 +206,31 @@ if (!function_exists('getProductCode')) {
     }
 
 }
+
+if (!function_exists('maxPricePaisa')) {
+    function maxPricePaisa(): int
+    {
+        return 1_000_000_000 * 100;
+    }
+}
+
+if (!function_exists('toPaisa')) {
+    function toPaisa($rupees): int
+    {
+        return (int) round(((float) $rupees) * 100);
+    }
+}
+
+if (!function_exists('fromPaisa')) {
+    function fromPaisa(int $paisa): float
+    {
+        return $paisa / 100;
+    }
+}
+
+if (!function_exists('formatPkr')) {
+    function formatPkr(int $paisa): string
+    {
+        return 'Rs ' . number_format(fromPaisa($paisa), 0, '.', ',');
+    }
+}

@@ -43,8 +43,11 @@ class User extends Authenticatable
         'type',
         'referral_code',
         'refer_by_id',
-        'referral_code_entered'
-
+        'referral_code_entered',
+        'username_changed_at',
+        'username_locked',
+        'marketing_opt_in',
+        'email_verified_at',
     ];
 
     /**
@@ -64,6 +67,9 @@ class User extends Authenticatable
      */
     protected $casts = [
         'email_verified_at' => 'datetime',
+        'username_changed_at' => 'datetime',
+        'username_locked' => 'boolean',
+        'marketing_opt_in' => 'boolean',
     ];
 
     public function locations()
@@ -109,5 +115,20 @@ class User extends Authenticatable
     public function engagements()
     {
         return $this->hasMany(Engagement::class);
+    }
+
+    public function subscriptions()
+    {
+        return $this->hasMany(Subscription::class);
+    }
+
+    public function payments()
+    {
+        return $this->hasMany(Payment::class);
+    }
+
+    public function verificationCodes()
+    {
+        return $this->hasMany(VerificationCode::class);
     }
 }

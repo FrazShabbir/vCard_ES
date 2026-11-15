@@ -31,18 +31,24 @@
                 <a href="{{route('user.profile')}}" class="iq-waves-effect"><i
                         class="las la-user iq-arrow-left"></i><span>My Profile</span></a>
             </li>
-            <li class="{{ request()->route()->getName() == 'user.profile.template'? 'active': '' }}">
-                <a href="{{ route('user.profile.template') }}" class="iq-waves-effect"><i
-                        class="las la-palette iq-arrow-left"></i><span>Template</span></a>
+            <li class="{{ request()->route()->getName() == 'user.onboarding'? 'active': '' }}">
+                <a href="{{ route('user.onboarding') }}" class="iq-waves-effect"><i
+                        class="las la-rocket iq-arrow-left"></i><span>Get started</span></a>
+            </li>
+            <li class="{{ in_array(request()->route()->getName(), ['user.appearance', 'user.profile.template', 'user.customizer', 'user.customizer.visual', 'user.customizer.create', 'user.customizer.edit', 'user.customizer.sections']) ? 'active': '' }}">
+                <a href="{{ route('user.appearance') }}" class="iq-waves-effect"><i
+                        class="las la-palette iq-arrow-left"></i><span>Appearance</span></a>
             </li>
             <li class="{{ request()->route()->getName() == 'user.socials'? 'active': '' }}">
                 <a href="{{route('user.socials')}}" class="iq-waves-effect"><i
-                        class="las la-user iq-arrow-left"></i><span>My Social</span></a>
+                        class="las la-share-alt iq-arrow-left"></i><span>My Social</span></a>
             </li>
+            @if(auth()->user()->type === 'business')
             <li class="{{ request()->route()->getName() == 'user.shop'? 'active': '' }}">
                 <a href="{{route('user.shop')}}" class="iq-waves-effect"><i
-                        class="las la-user iq-arrow-left"></i><span>My Shop</span></a>
+                        class="las la-store iq-arrow-left"></i><span>My Shop</span></a>
             </li>
+            @endif
 
 
     </ul>

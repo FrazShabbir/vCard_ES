@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
     @include('frontend.pages.cards.partials._meta')
+    @include('frontend.pages.cards.partials._customization')
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,600;9..40,700&display=swap" rel="stylesheet">
@@ -70,6 +71,7 @@
             @endif
         </div>
         @include('frontend.pages.cards.partials._shop')
+        @include('frontend.pages.cards.partials._sections')
         <div class="t3-footer">@include('frontend.pages.cards.partials._footer')</div>
     </div>
 </body>

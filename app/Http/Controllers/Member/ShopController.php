@@ -4,15 +4,24 @@ namespace App\Http\Controllers\Member;
 
 use App\Http\Controllers\Controller;
 use App\Models\Product;
+use App\Models\ProductImage;
 use App\Models\Shop;
 use App\Models\ShortLink;
 use Illuminate\Http\Request;
-use Session;
+use Illuminate\Support\Facades\Session;
 
 class ShopController extends Controller
 {
+    protected function ensureBusiness()
+    {
+        if (auth()->user()->type !== 'business') {
+            abort(403, 'Shop is available for business accounts only.');
+        }
+    }
+
     public function index()
     {
+        $this->ensureBusiness();
         $shop = Shop::where('user_id', auth()->user()->id)->first();
 
         return view('user.shop.index')
@@ -20,6 +29,7 @@ class ShopController extends Controller
     }
     public function store(Request $request)
     {
+        $this->ensureBusiness();
         $request->validate([
             'name' => 'required',
             'address' => 'required',
@@ -57,6 +67,7 @@ class ShopController extends Controller
 
     public function update(Request $request, $slug)
     {
+        $this->ensureBusiness();
         $request->validate([
             'name' => 'required',
             'address' => 'required',
@@ -91,14 +102,23 @@ class ShopController extends Controller
         $shop->save();
         return redirect()->back()->with('success', 'Shop created successfully');
     }
+    public function createProduct()
+    {
+        $this->ensureBusiness();
+        $shop = Shop::where('user_id', auth()->id())->firstOrFail();
+        return view('user.shop.product.create', [
+            'shop' => $shop,
+        ]);
+    }
     public function storeProduct(Request $request)
     {
+        $this->ensureBusiness();
         $request->validate([
             'name' => 'required',
-            'original_price' => 'required',
-            'sale_price' => 'nullable',
+            'original_price' => 'required|numeric',
+            'sale_price' => 'nullable|numeric',
             'description' => 'required',
-            'image' => 'nullable',
+            'images.*' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:4096',
         ]);
         $product = new Product();
         $product->name = $request->name;
@@ -107,26 +127,51 @@ class ShopController extends Controller
         $product->original_price = $request->original_price;
         $product->sale_price = $request->sale_price;
         $product->description = $request->description;
-        // $product->image = $request->image;
         $product->save();
+
+        if ($request->hasFile('images')) {
+            $sort = 0;
+            foreach ($request->file('images') as $file) {
+                if (!$file->isValid()) {
+                    continue;
+                }
+                $extension = $file->getClientOriginalExtension();
+                $filename = getRandomString() . '-' . time() . '-' . $sort . '.' . $extension;
+                $file->move('uploads/products', $filename);
+                $path = 'uploads/products/' . $filename;
+                ProductImage::create([
+                    'product_id' => $product->id,
+                    'path' => $path,
+                    'sort_order' => $sort,
+                ]);
+                $sort++;
+            }
+        }
+
         return redirect()->back()->with('success', 'Product created successfully');
     }
 
-    public function editProduct(Request $request)
+    public function editProduct($slug)
     {
-        $product = Product::where('slug', $request->id)->first();
-        return view('user.shop.product.edit')
-            ->with('product', $product);
+        $this->ensureBusiness();
+        $product = Product::where('slug', $slug)->firstOrFail();
+        if ($product->shop_id != auth()->user()->shop->id) {
+            abort(403);
+        }
+        return view('user.shop.product.edit', [
+            'product' => $product,
+        ]);
     }
 
     public function updateProduct(Request $request, $slug)
     {
+        $this->ensureBusiness();
         $request->validate([
             'name' => 'required',
-            'original_price' => 'required',
-            'sale_price' => 'nullable',
+            'original_price' => 'required|numeric',
+            'sale_price' => 'nullable|numeric',
             'description' => 'required',
-            'image' => 'nullable',
+            'images.*' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:4096',
         ]);
 
         $product = Product::where('slug', $slug)->first();
@@ -141,8 +186,27 @@ class ShopController extends Controller
         $product->original_price = $request->original_price;
         $product->sale_price = $request->sale_price;
         $product->description = $request->description;
-        // $product->image = $request->image;
         $product->save();
+
+        if ($request->hasFile('images')) {
+            $existingMax = (int) $product->images()->max('sort_order');
+            $sort = $existingMax + 1;
+            foreach ($request->file('images') as $file) {
+                if (!$file->isValid()) {
+                    continue;
+                }
+                $extension = $file->getClientOriginalExtension();
+                $filename = getRandomString() . '-' . time() . '-' . $sort . '.' . $extension;
+                $file->move('uploads/products', $filename);
+                $path = 'uploads/products/' . $filename;
+                ProductImage::create([
+                    'product_id' => $product->id,
+                    'path' => $path,
+                    'sort_order' => $sort,
+                ]);
+                $sort++;
+            }
+        }
         Session::flash('success', 'Product updated successfully');
         return redirect()->back();
     }

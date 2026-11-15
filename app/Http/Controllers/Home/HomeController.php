@@ -3,20 +3,16 @@
 namespace App\Http\Controllers\Home;
 
 use App\Http\Controllers\Controller;
-use App\Models\Device;
-use App\Models\Geolocation;
+use App\Jobs\RecordCardView;
 use App\Models\Profile;
 use App\Models\ShortLink;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
 use Jenssegers\Agent\Facades\Agent;
 use JeroenDesloovere\VCard\VCard;
-use Stevebauman\Location\Facades\Location;
-use App\Models\Engagement;
 
 class HomeController extends Controller
 {
@@ -46,7 +42,7 @@ class HomeController extends Controller
             'profile.primaryaddress.city', 'profile.primaryaddress.state', 'profile.primaryaddress.country',
             'profile.socials.shortlink', 'profile.socials.platform',
             'profile.customlinks.shortlink', 'profile.googlereview.shortlink',
-            'shop.products',
+            'shop.products.images',
         ])->where('username', $slug)->first();
 
         if ($user) {
@@ -55,100 +51,68 @@ class HomeController extends Controller
                 abort(404, 'Profile not found');
             }
             try {
-                DB::beginTransaction();
-
-                $location_id = null;
-                $location_info = config('app.env') === 'local'
-                    ? Location::get('182.185.236.113')
-                    : Location::get($request->ip());
-
-                if ($location_info != null) {
-                    $findIP = Geolocation::where('user_id', $user->id)->where('ip_address', $request->ip())->first();
-
-
-                    if ($findIP) {
-                        $location_id = $findIP->id;
-                        $is_unique_location = false;
-                    }
-                    if (!$findIP) {
-
-                        $location = Geolocation::create([
-                            'user_id' => $user->id,
-                            'ip_address' => $request->ip(),
-                            'country_name' => $location_info->countryName,
-                            'country_code' => $location_info->countryCode,
-                            'region_code' => $location_info->regionCode,
-                            'region_name' => $location_info->regionName,
-                            'city_name' => $location_info->cityName,
-                            'zip_code' => $location_info->zipCode,
-                            'iso_code' => $location_info->isoCode,
-                            'postal_code' => $location_info->postalCode,
-                            'latitude' => $location_info->latitude,
-                            'longitude' => $location_info->longitude,
-                            'metro_code' => $location_info->metroCode,
-                            'area_code' => $location_info->areaCode,
-                            'timezone' => $location_info->timezone,
-                            'device' => Agent::device(),
-                            'platform' => Agent::platform(),
-                            'platform_version' => Agent::version(Agent::platform()),
-                            'browser' => Agent::browser(),
-                            'browser_version' => Agent::version(Agent::browser()),
-                        ]);
-                        $location_id = $location->id;
-                        $is_unique_location = true;
-                    }
-
-                }
-
-                if ($location_id !== null) {
-                    $findDevice = Device::where('user_id', $user->id)->where('ip_address', $request->ip())
-                        ->where('geolocation_id', $location_id)->where('device', Agent::device())->where('platform', Agent::platform())->first();
-                    if (!$findDevice) {
-                        $deviceType = Agent::isDesktop() ? 'Desktop' : (Agent::isTablet() ? 'Tablet' : (Agent::isPhone() ? 'Phone' : 'Other'));
-                        $device = Device::create([
-                            'user_id' => $user->id,
-                            'geolocation_id' => $location_id,
-                            'ip_address' => $request->ip(),
-                            'device' => Agent::device(),
-                            'device_type' => $deviceType,
-                            'platform' => Agent::platform(),
-                            'platform_version' => Agent::version(Agent::platform()),
-                            'browser' => Agent::browser(),
-                            'browser_version' => Agent::version(Agent::browser()),
-                        ]);
-                        $user->increment('reach');
-                        $is_unique_device = true;
-                    } else {
-                        $device = $findDevice;
-                        $is_unique_device = false;
-                    }
-                    Engagement::create([
-                        'user_id' => $user->id,
-                        'geolocation_id' => $location_id,
-                        'device_id' => $device->id,
-                        'is_unique_location' => $is_unique_location,
-                        'is_unique_device' => $is_unique_device,
-                    ]);
-                }
-
-                $user->increment('count');
-                DB::commit();
+                // Analytics off the request path (sync when QUEUE_CONNECTION=sync)
+                $deviceType = Agent::isDesktop() ? 'Desktop' : (Agent::isTablet() ? 'Tablet' : (Agent::isPhone() ? 'Phone' : 'Other'));
+                RecordCardView::dispatch($user->id, $request->ip(), [
+                    'device' => Agent::device(),
+                    'device_type' => $deviceType,
+                    'platform' => Agent::platform(),
+                    'platform_version' => Agent::version(Agent::platform()),
+                    'browser' => Agent::browser(),
+                    'browser_version' => Agent::version(Agent::browser()),
+                ]);
 
                 $profileUrl = url()->current();
                 $avatarUrl = $this->profileAvatarUrl($profile, $user);
-                $viewData = compact('user', 'profile', 'profileUrl', 'avatarUrl');
 
-                if (auth()->check() && (int) auth()->user()->id === (int) $user->id && $request->filled('preview_template')) {
+                $isOwner = auth()->check() && (int) auth()->user()->id === (int) $user->id;
+
+                // Template gallery preview: owner ?preview_template=N skips customization entirely
+                if ($isOwner && $request->filled('preview_template')) {
                     $templateId = max(1, min(10, (int) $request->preview_template));
-                } else {
-                    $templateId = (int) ($profile->template_id ?? 1);
-                    $templateId = max(1, min(10, $templateId));
+                    $sections = collect();
+                    $customization = null;
+                    $viewData = compact('user', 'profile', 'profileUrl', 'avatarUrl', 'customization', 'sections');
+                    return view('frontend.pages.cards.templates.template' . $templateId, $viewData)
+                        ->with('extra_class', 'd-none');
                 }
-                $viewName = 'frontend.pages.cards.templates.template' . $templateId;
 
-                return view($viewName, $viewData)->with('extra_class', 'd-none');
+                // Builder preview: owner may force a specific draft/active customization
+                $customization = null;
+                if ($isOwner && $request->filled('customization_id')) {
+                    $customization = \App\Models\TemplateCustomization::where('id', $request->customization_id)
+                        ->where('user_id', $user->id)
+                        ->first();
+                }
+
+                $appearanceMode = $profile->appearance_mode ?? 'template';
+
+                // Live card: Template mode vs Custom design mode
+                if (!$customization && $appearanceMode === 'custom') {
+                    if ($profile->customization_id) {
+                        $customization = \App\Models\TemplateCustomization::find($profile->customization_id);
+                    }
+                    if (!$customization) {
+                        $customization = \App\Models\TemplateCustomization::getActiveForUser($user->id);
+                    }
+                }
+
+                $customizationId = $customization ? $customization->id : null;
+                $sections = \App\Models\CustomSection::getForUser($user->id, $customizationId);
+                $sections->load('teamMembers');
+
+                $viewData = compact('user', 'profile', 'profileUrl', 'avatarUrl', 'customization', 'sections');
+
+                // Custom mode or builder preview with a customization → dynamic view
+                if ($customization && ($appearanceMode === 'custom' || ($isOwner && $request->filled('customization_id')))) {
+                    return view('frontend.pages.cards.dynamic', $viewData)->with('extra_class', 'd-none');
+                }
+
+                $templateId = (int) ($profile->template_id ?? 1);
+                $templateId = max(1, min(10, $templateId));
+                return view('frontend.pages.cards.templates.template' . $templateId, $viewData)
+                    ->with('extra_class', 'd-none');
             } catch (\Throwable $th) {
-                DB::rollback();
                 throw $th;
             }
 

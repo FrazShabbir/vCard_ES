@@ -39,7 +39,7 @@ class Kernel extends HttpKernel
         ],
 
         'api' => [
-            // \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
+            \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
             'throttle:api',
             \Illuminate\Routing\Middleware\SubstituteBindings::class,
         ],
@@ -67,6 +67,8 @@ class Kernel extends HttpKernel
         'role' => \Spatie\Permission\Middlewares\RoleMiddleware::class,
         'CheckBrowser' => \App\Http\Middleware\CheckBrowser::class,
         'CheckProfile' => \App\Http\Middleware\CheckProfile::class,
+        'entitled' => \App\Http\Middleware\EnsureEntitled::class,
+        'api.verified' => \App\Http\Middleware\EnsureApiEmailVerified::class,
 
     ];
 }
